@@ -33,6 +33,7 @@ namespace solidity {
 
 class Type;
 class ArrayType;
+class FunctionType;
 using TypePointer = std::shared_ptr<Type const>;
 using TypePointers = std::vector<TypePointer>;
 
@@ -69,13 +70,44 @@ private:
 	/// (i.e. "clean"). Asserts on failure.
 	std::string conversionFunction(Type const& _from, Type const& _to);
 
-	// @returns the name of the ABI encoding function with the given type
-	// and queues the generation of the function to the requested functions.
+	std::string cleanupCombinedExternalFunctionIdFunction();
+
+	/// @returns the name of the ABI encoding function with the given type
+	/// and queues the generation of the function to the requested functions.
+	/// @param _compacted if true, the input value was just loaded from storage
+	/// or memory and thus might be compacted into a single slot (depending on the type).
 	std::string abiEncodingFunction(
+		Type const& _givenType,
+		Type const& _targetType,
+		bool _encodeAsLibraryTypes,
+		bool _compacted
+	);
+	/// Part of @a abiEncodingFunction for array target type and given calldata array.
+	std::string abiEncodingFunctionCalldataArray(
 		Type const& _givenType,
 		Type const& _targetType,
 		bool _encodeAsLibraryTypes
 	);
+	/// Part of @a abiEncodingFunction for array target type and given memory array or
+	/// a given storage array with one item per slot.
+	std::string abiEncodingFunctionSimpleArray(
+		ArrayType const& _givenType,
+		ArrayType const& _targetType,
+		bool _encodeAsLibraryTypes
+	);
+	std::string abiEncodingFunctionMemoryByteArray(
+		ArrayType const& _givenType,
+		ArrayType const& _targetType,
+		bool _encodeAsLibraryTypes
+	);
+	/// Part of @a abiEncodingFunction for array target type and given storage array
+	/// where multiple items are packed into the same storage slot.
+	std::string abiEncodingFunctionCompactStorageArray(
+		ArrayType const& _givenType,
+		ArrayType const& _targetType,
+		bool _encodeAsLibraryTypes
+	);
+
 
 	// @returns the name of the ABI encoding function with the given type
 	// and queues the generation of the function to the requested functions.
@@ -86,16 +118,44 @@ private:
 		bool _encodeAsLibraryTypes
 	);
 
+	std::string abiEncodingFunctionFunctionType(
+		FunctionType const& _from,
+		Type const& _to,
+		bool _encodeAsLibraryTypes,
+		bool _compacted
+	);
+
+	/// @returns a function that combines the address and selector to a single value
+	/// for use in the ABI.
+	std::string combineExternalFunctionIdFunction();
+
+	/// @returns a function that copies raw bytes of dynamic length from calldata
+	/// or memory to memory.
+	/// Pads with zeros and might write more than exactly length.
+	std::string copyToMemoryFunction(bool _fromCalldata);
 
 	std::string shiftLeftFunction(size_t _numBits);
 	std::string shiftRightFunction(size_t _numBits, bool _signed);
+	/// @returns the name of a function that rounds its input to the next multiple
+	/// of 32 or the input if it is a multiple of 32.
+	std::string roundUpFunction();
 
-	std::string arrayLengthFunction(ArrayType const& _Type);
+	std::string arrayLengthFunction(ArrayType const& _type);
+	/// @returns the name of a function that converts a storage slot number
+	/// or a memory pointer to the slot number / memory pointer for the data position of an array
+	/// which is stored in that slot / memory area.
+	std::string arrayDataAreaFunction(ArrayType const& _type);
+	/// @returns the name of a function that advances an array data pointer to the next element.
+	/// Only works for memory arrays and storage arrays that store one item per slot.
+	std::string nextArrayElementFunction(ArrayType const& _type);
 
 	/// Helper function that uses @a _creator to create a function and add it to
 	/// @a m_requestedFunctions if it has not been created yet and returns @a _name in both
 	/// cases.
 	std::string createFunction(std::string const& _name, std::function<std::string()> const& _creator);
+
+	/// @returns the size of the static part of the encoding of the given types.
+	size_t headSize(TypePointers const& _targetTypes);
 
 	/// Map from function name to code for a multi-use function.
 	std::map<std::string, std::string> m_requestedFunctions;

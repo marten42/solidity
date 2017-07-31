@@ -86,7 +86,7 @@ void CompilerUtils::loadFromMemoryDynamic(
 	bool _padToWordBoundaries,
 	bool _keepUpdatedMemoryOffset
 )
-{		
+{
 	if (_keepUpdatedMemoryOffset)
 		m_context << Instruction::DUP1;
 
@@ -185,7 +185,10 @@ void CompilerUtils::encodeToMemory(
 		return;
 	else if (_padToWordBoundaries && !_copyDynamicDataInPlace)
 	{
+		// Use the new JULIA-based encoding function
+		auto stackHeightBefore = m_context.stackHeight();
 		abiEncode(_givenTypes, targetTypes, _encodeAsLibraryTypes);
+		solAssert(stackHeightBefore - m_context.stackHeight() == sizeOnStack(_givenTypes), "");
 		return;
 	}
 
@@ -304,10 +307,9 @@ void CompilerUtils::abiEncode(
 	// stack: <$value0> <$value1> ... <$value(n-1)> <$headStart>
 
 	vector<string> variables;
-	size_t v = 0;
-	for (size_t i = 0; i < _givenTypes.size(); ++i)
-		for (size_t j = 0; j < _givenTypes[i]->sizeOnStack(); j++)
-			variables.push_back("$value" + to_string(v++));
+	size_t numValues = sizeOnStack(_givenTypes);
+	for (size_t i = 0; i < numValues; ++i)
+			variables.push_back("$value" + to_string(i));
 	variables.push_back("$headStart");
 
 	ABIFunctions funs;
@@ -317,7 +319,7 @@ void CompilerUtils::abiEncode(
 //	cout << routine << endl << endl;
 	m_context.appendInlineAssembly("{" + routine + "}", variables);
 	// Remove everyhing except for "value0" / the final memory pointer.
-	popStackSlots(_givenTypes.size());
+	popStackSlots(numValues);
 }
 
 void CompilerUtils::zeroInitialiseMemoryArray(ArrayType const& _type)
@@ -527,7 +529,7 @@ void CompilerUtils::convertType(
 		else if (targetTypeCategory == Type::Category::FixedPoint)
 		{
 			solAssert(
-				stackTypeCategory == Type::Category::Integer || 
+				stackTypeCategory == Type::Category::Integer ||
 				stackTypeCategory == Type::Category::RationalNumber ||
 				stackTypeCategory == Type::Category::FixedPoint,
 				"Invalid conversion to FixedMxNType requested."
