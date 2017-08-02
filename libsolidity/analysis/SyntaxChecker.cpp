@@ -77,6 +77,8 @@ bool SyntaxChecker::visit(PragmaDirective const& _pragma)
 				"At least one experimental feature or the wildcard symbol \"*\" is required."
 			);
 		else
+		{
+			m_errorReporter.warning(_pragma.location(), "Experimental features are turned on. Do not use experimental features on live deployments.");
 			for (string const literal: literals)
 			{
 				if (literal.empty())
@@ -86,6 +88,7 @@ bool SyntaxChecker::visit(PragmaDirective const& _pragma)
 				else
 					m_sourceUnit->annotation().experimentalFeatures.insert(literal);
 			}
+		}
 	}
 	else if (_pragma.literals()[0] == "solidity")
 	{
