@@ -6523,6 +6523,30 @@ BOOST_AUTO_TEST_CASE(builtin_reject_value)
 	CHECK_ERROR(text, TypeError, "Member \"value\" not found or not visible after argument-dependent lookup");
 }
 
+BOOST_AUTO_TEST_CASE(calling_unimplemented_internal_functions)
+{
+	char const* text = R"(
+		contract C {
+			function f() internal;
+			function g() { f(); }
+		}
+	)";
+	CHECK_SUCCESS_NO_WARNINGS(text);
+}
+
+BOOST_AUTO_TEST_CASE(calling_unimplemented_internal_library_functions)
+{
+	char const* text = R"(
+		library L {
+			function f() internal;
+		}
+		contract C {
+			function g() { L.f(); }
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Inlined library function is lacking implementation.");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }
